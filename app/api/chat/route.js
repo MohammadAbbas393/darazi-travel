@@ -1,16 +1,9 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { supabase } from '@/lib/supabase';
 
-function getPackages() {
-  try {
-    const raw = fs.readFileSync(path.join(process.cwd(), 'data', 'packages.json'), 'utf8');
-    return JSON.parse(raw);
-  } catch { return []; }
-}
+async function buildSystem() {
+  const { data: packages = [] } = await supabase.from('packages').select('*').order('id');
 
-function buildSystem() {
-  const packages = getPackages();
 
   const packageList = packages.length > 0
     ? packages.map((p, i) => {
@@ -19,7 +12,7 @@ function buildSystem() {
         if (p.nights) parts.push(p.nights);
         if (p.hotel)  parts.push(p.hotel);
         if (p.meals)  parts.push(p.meals);
-        if (p.desc)   parts.push(p.desc);
+        if (p.desc || p.description) parts.push(p.desc || p.description);
         return parts.join(' — ');
       }).join('\n')
     : 'No packages currently listed. Direct users to visit the Packages page or call us.';
@@ -57,7 +50,7 @@ export async function POST(req) {
 
     // Convert history from Gemini format to OpenAI format
     const messages = [
-      { role: 'system', content: buildSystem() },
+      { role: 'system', content: await buildSystem() },
       ...history.map(h => ({
         role: h.role === 'model' ? 'assistant' : 'user',
         content: h.parts?.[0]?.text ?? '',
